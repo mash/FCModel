@@ -281,6 +281,13 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
 + (NSString *)primaryKeyFieldName   { return checkForOpenDatabaseFatal(NO) ? g_primaryKeyFieldName[self] : nil; }
 + (FCModelFieldInfo *)infoForFieldName:(NSString *)fieldName { return checkForOpenDatabaseFatal(NO) ? g_fieldInfo[self][fieldName] : nil; }
 
++ (NSString *)tableName {
+    NSString *tableName = NSStringFromClass(self);
+    NSString *executableName = [[NSBundle mainBundle] infoDictionary][ @"CFBundleExecutable" ];
+    tableName = [tableName stringByReplacingOccurrencesOfString:[NSString stringWithFormat:@"%@.", executableName] withString:@""];
+    return tableName;
+}
+
 // For unique-instance consistency:
 // Resolve discrepancies between supplied primary-key value type and the column type that comes out of the database.
 // Without this, it's possible to e.g. pull objects with key @1 and key @"1" as two different instances of the same record.
@@ -605,7 +612,7 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
     BOOL databaseIsOpen = checkForOpenDatabaseFatal(NO);
     
     // Emulation for old AUTOINCREMENT tables
-    if (databaseIsOpen && g_tablesUsingAutoIncrementEmulation && [g_tablesUsingAutoIncrementEmulation containsObject:NSStringFromClass(self)]) {
+    if (databaseIsOpen && g_tablesUsingAutoIncrementEmulation && [g_tablesUsingAutoIncrementEmulation containsObject:[self tableName]]) {
         id largestNumber = [self firstValueFromQuery:@"SELECT MAX($PK) FROM $T"];
         int64_t largestExistingValue = largestNumber && largestNumber != NSNull.null ? ((NSNumber *) largestNumber).longLongValue : 0;
 
@@ -846,7 +853,8 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
         NSSet *changedFields;
         NSMutableArray *values;
         
-        NSString *tableName = NSStringFromClass(self.class);
+        NSString *tableName = [self.class tableName];
+
         NSString *pkName = g_primaryKeyFieldName[self.class];
         id primaryKey = [self encodedValueForFieldName:pkName];
         NSAssert1(primaryKey, @"Cannot update %@ without primary key value", NSStringFromClass(self.class));
@@ -1025,7 +1033,11 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
 {
     if (self == FCModel.class) return query;
     query = [query stringByReplacingOccurrencesOfString:@"$PK" withString:g_primaryKeyFieldName[self]];
-    return [query stringByReplacingOccurrencesOfString:@"$T" withString:NSStringFromClass(self)];
+
+    // take care of swift model classes returning "{CFBundleExecutable}.{class name}" for NSStringFromClass(self)
+    NSString *tableName = [self tableName];
+    query = [query stringByReplacingOccurrencesOfString:@"$T" withString:tableName];
+    return query;
 }
 
 - (NSString *)description
@@ -1088,9 +1100,13 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
        ];
         while ([tablesRS next]) {
             NSString *tableName = [tablesRS stringForColumnIndex:0];
-            Class tableModelClass = NSClassFromString(tableName);
+
+            // swift: we need to prepend executable name to make NSClassFromString return non-nil
+            NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+            NSString *bundleName = info[ @"CFBundleExecutable" ];
+            Class tableModelClass = NSClassFromString([NSString stringWithFormat:@"%@.%@",bundleName,tableName]);
             if (! tableModelClass || ! [tableModelClass isSubclassOfClass:self]) continue;
-            
+
             NSString *primaryKeyName = nil;
             int primaryKeyColumnCount = 0;
             NSMutableDictionary *fields = [NSMutableDictionary dictionary];
