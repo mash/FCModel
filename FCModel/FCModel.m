@@ -542,7 +542,23 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
         [s close];
     }];
     va_end(args);
-    
+
+    return count;
+}
+
++ (NSUInteger)numberOfInstancesWhere:(NSString *)queryAfterWHERE args:(NSArray*)args
+{
+    __block NSUInteger count = 0;
+    [g_databaseQueue inDatabase:^(FMDatabase *db) {
+        FMResultSet *s = [db executeQuery:[self expandQuery:[@"SELECT COUNT(*) FROM $T WHERE " stringByAppendingString:queryAfterWHERE]] withArgumentsInArray:args orDictionary:nil orVAList:nil];
+        if (! s) [self queryFailedInDatabase:db];
+        if ([s next]) {
+            NSNumber *value = [s objectForColumnIndex:0];
+            if (value) count = value.unsignedIntegerValue;
+        }
+        [s close];
+    }];
+
     return count;
 }
 
