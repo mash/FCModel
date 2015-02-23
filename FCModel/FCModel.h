@@ -123,6 +123,8 @@ typedef NS_ENUM(NSInteger, FCModelSaveResult) {
 + (instancetype)firstInstanceFromResultSet:(FMResultSet *)rs;
 
 + (instancetype)firstInstanceWhere:(NSString *)queryAfterWHERE, ...;
++ (instancetype)firstInstanceWhere:(NSString *)queryAfterWHERE arguments:(NSArray*)array;
+
 + (NSArray *)instancesWhere:(NSString *)queryAfterWHERE, ...;
 + (NSArray *)instancesWhere:(NSString *)queryAfterWHERE arguments:(NSArray *)array;
 + (NSDictionary *)keyedInstancesWhere:(NSString *)queryAfterWHERE, ...;
@@ -153,6 +155,8 @@ typedef NS_ENUM(NSInteger, FCModelSaveResult) {
 + (NSArray *)cachedInstancesWhere:(NSString *)queryAfterWHERE arguments:(NSArray *)arguments ignoreFieldsForInvalidation:(NSSet *)ignoredFields;
 + (id)cachedObjectWithIdentifier:(id)identifier generator:(id (^)(void))generatorBlock;
 + (id)cachedObjectWithIdentifier:(id)identifier ignoreFieldsForInvalidation:(NSSet *)ignoredFields generator:(id (^)(void))generatorBlock;
+
++ (NSArray*)valuesOfColumn:(NSString*)column queryAfterWHERE:(NSString *)query argsArray:(NSArray *)argsArray;
 
 // For subclasses to override, all optional:
 

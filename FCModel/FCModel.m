@@ -216,6 +216,42 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
     });
 }
 
+#pragma mark - Column value fetching
+
++ (NSArray*)valuesOfColumn:(NSString*)column queryAfterWHERE:(NSString *)query argsArray:(NSArray *)argsArray
+{
+    if (! checkForOpenDatabaseFatal(NO)) return nil;
+
+    NSMutableArray *values = @[].mutableCopy;
+
+    void (^processResult)(FMResultSet *, BOOL *) = ^(FMResultSet *s, BOOL *stop){
+        NSDictionary *rowDictionary = s.resultDictionary;
+        [values addObject:rowDictionary[column]];
+    };
+
+    // careful, column is not escaped, don't use user-generated column here
+    NSString *selectPart = [NSString stringWithFormat:@"SELECT %@ FROM \"$T\"", column];
+
+    [g_databaseQueue inDatabase:^(FMDatabase *db) {
+            FMResultSet *s = [db
+                              executeQuery:(
+                                            query ?
+                                            [self expandQuery:[[selectPart stringByAppendingString:@" WHERE " ] stringByAppendingString:query]] :
+                                            [self expandQuery:selectPart]
+                                            )
+                              withArgumentsInArray:argsArray
+                              orDictionary:nil
+                              orVAList:NULL
+                              ];
+            if (! s) [self queryFailedInDatabase:db];
+            BOOL stop = NO;
+            while (! stop && [s next]) processResult(s, &stop);
+            [s close];
+        }];
+
+    return values;
+}
+
 #pragma mark - Mapping properties to database fields
 
 - (id)serializedDatabaseRepresentationOfValue:(id)instanceValue forPropertyNamed:(NSString *)propertyName
@@ -428,6 +464,12 @@ static inline BOOL checkForOpenDatabaseFatal(BOOL fatal)
     va_start(args, query);
     id result = [self _instancesWhere:query andArgs:args orArgsArray:nil orResultSet:nil onlyFirst:YES keyed:NO];
     va_end(args);
+    return result;
+}
+
++ (instancetype)firstInstanceWhere:(NSString *)query arguments:(NSArray*)array
+{
+    id result = [self _instancesWhere:query andArgs:NULL orArgsArray:array orResultSet:nil onlyFirst:YES keyed:NO];
     return result;
 }
 
